@@ -1094,6 +1094,26 @@ export function mergeHook(
 		else if (key === 'response' && a.response && b.response)
 			a.response = mergeResponse(b.response, a.response) as any
 
+	// `tags` is shorthand for `detail.tags`
+	if (!(a as any).tags && (b as any).tags) (a as any).tags = (b as any).tags
+
+	// `detail` is not an event, so it is absent from `eventProperties` and
+	// never reached this merge (#1972). `b` is memoized across sibling routes,
+	// so clone before adopting. Arrays override rather than concatenate
+	const aDetail = (a as any).detail
+	const bDetail = (b as any).detail
+	if (bDetail)
+		if (!aDetail) (a as any).detail = clonePlainDeep(bDetail)
+		else {
+			const detail = clonePlainDeep(bDetail)
+
+			// `clonePlainDeep` returns non-plain leaves, TypeBox models
+			// among them, by reference — guard them before `mergeDeep`
+			// writes the route's keys into a shared object
+			guardNonPlainLeaves(detail, aDetail)
+			;(a as any).detail = mergeDeep(detail, aDetail)
+		}
+
 	for (const key of hookEventKeys)
 		if ((a as any)[key] || (b as any)[key])
 			(a as any)[key] = mergeArray((a as any)[key], (b as any)[key], true)
