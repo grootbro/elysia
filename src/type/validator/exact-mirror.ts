@@ -1,3 +1,4 @@
+import { isCloudflareWorker } from '../../universal/constants'
 import { syncRequire } from '../sync-require'
 import { requireExactMirror } from './exact-mirror-require'
 
@@ -10,6 +11,10 @@ let resolved = false
 export const getExactMirror = () => {
 	if (resolved) return exactMirror
 	resolved = true
+
+	// workerd's module fallback can log host errors before require throws.
+	// AOT wiring or setupTypebox registers a mirror without probing CommonJS.
+	if (isCloudflareWorker) return undefined
 
 	try {
 		const module =
