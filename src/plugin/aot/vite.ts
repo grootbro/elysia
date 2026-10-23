@@ -6,6 +6,7 @@ export interface ElysiaAotVitePlugin
 	name: string
 	enforce?: 'pre'
 	apply?: 'build'
+	configResolved?(config: { command: string }): void
 }
 
 /**
@@ -27,13 +28,21 @@ export const aot = (
 	options?: ElysiaAotOptions
 ): ElysiaAotVitePlugin => {
 	const hooks = createAotPluginHooks(entry, options)
+	let serving = false
 
 	return {
 		name: 'elysia-aot',
 		enforce: 'pre',
-		apply: 'build',
+		// Workers cannot use the runtime JIT fallback during development.
+		...(options?.target === 'workerd' ? {} : { apply: 'build' as const }),
+		configResolved(config) {
+			serving = config.command === 'serve'
+		},
 		buildStart: hooks.buildStart,
-		buildEnd: hooks.buildEnd,
+		buildEnd() {
+			// Vite dev can close before any request has loaded the entry.
+			if (!serving) hooks.buildEnd()
+		},
 		resolveId: hooks.resolveId,
 		load: hooks.load,
 		transform: hooks.transform
