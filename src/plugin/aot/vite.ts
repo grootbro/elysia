@@ -30,6 +30,9 @@ export interface ElysiaAotVitePlugin extends Omit<
 	name: string
 	enforce?: 'pre'
 	apply?: 'build'
+	applyToEnvironment?(environment: {
+		config: { command: 'build' | 'serve'; consumer: 'client' | 'server' }
+	}): boolean
 	configResolved?(config: { command: string }): void
 	hotUpdate?(context: ViteAotUpdate): Promise<[] | void>
 }
@@ -67,6 +70,15 @@ export const aot = (
 		enforce: 'pre',
 		// Workers cannot use the runtime JIT fallback during development.
 		...(options?.target === 'workerd' ? {} : { apply: 'build' as const }),
+		applyToEnvironment(environment) {
+			// Cloudflare builds public assets in a separate client graph.
+			// Dev still needs the client buildStart hook to capture the app.
+			return (
+				options?.target !== 'workerd' ||
+				environment.config.command !== 'build' ||
+				environment.config.consumer === 'server'
+			)
+		},
 		configResolved(config) {
 			serving = config.command === 'serve'
 		},
